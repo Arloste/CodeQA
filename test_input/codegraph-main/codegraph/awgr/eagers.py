@@ -1,0 +1,2 @@
+def cfa():
+    return "awgga"
