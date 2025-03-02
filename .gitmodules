@@ -1,0 +1,6 @@
+[submodule "G-Retriever"]
+	path = G-Retriever
+	url = https://github.com/Arloste/G-Retriever.git
+[submodule "RepoGraph"]
+	path = RepoGraph
+	url = https://github.com/Arloste/RepoGraph.git
