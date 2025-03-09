@@ -1,4 +1,5 @@
 import json
+from tqdm import tqdm
 
 with open("tags.json", 'r') as f:
     data = [
@@ -8,7 +9,8 @@ with open("tags.json", 'r') as f:
 # list unique files
 
 unique_files = set()
-for item in data:
+print("Stage 1: getting all unique files")
+for item in tqdm(data):
     unique_files.add(item['rel_fname'])
 
 unique_files = ["root/"+x for x in list(unique_files)]
@@ -29,7 +31,9 @@ def extract_relationships(file_paths):
     """
     relationships = set()
 
-    for path in file_paths:
+    print("Stage 2: creating the file structure")
+
+    for path in tqdm(file_paths):
         # Split the path into components
         parts = path.split('/')
 
@@ -59,7 +63,8 @@ relationships = extract_relationships(unique_files)
 defs = list()
 defs_dict = dict()
 
-for item in data:
+print("Stage 3: parsing definitions")
+for item in tqdm(data):
     if item['kind'] == "ref": continue
     """f
     This thing also provides those relations
@@ -114,20 +119,22 @@ def resolve_reference(name, file_path, project_root):
     """
 
     # Parse the file to analyze imports and definitions
-    with open(os.path.join(project_root, file_path), 'r') as file:
-        tree = ast.parse(file.read())
+    try:
+        # Track imports
+        imports = {}
 
-    # Track imports
-    imports = {}
+        with open(os.path.join(project_root, file_path), 'r') as file:
+            tree = ast.parse(file.read())
 
-    for node in ast.walk(tree):
-        if isinstance(node, ast.Import):
-            for alias in node.names:
-                imports[alias.asname or alias.name] = alias.name
-        elif isinstance(node, ast.ImportFrom):
-            module = node.module
-            for alias in node.names:
-                imports[alias.asname or alias.name] = f"{module}.{alias.name}"
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Import):
+                for alias in node.names:
+                    imports[alias.asname or alias.name] = alias.name
+            elif isinstance(node, ast.ImportFrom):
+                module = node.module
+                for alias in node.names:
+                    imports[alias.asname or alias.name] = f"{module}.{alias.name}"
+    except: pass
 
     # Check if the name is imported
     if name in imports:
@@ -145,24 +152,18 @@ def resolve_reference(name, file_path, project_root):
                 return module_file
 
     # Search the project directory for the definition
-    for root, dirs, files in os.walk(project_root):
-        for file in files:
-            if file.endswith('.py'):
-                module_file_path = os.path.join(root, file)
-                with open(module_file_path, 'r') as f:
-                    module_tree = ast.parse(f.read())
-                    for node in ast.walk(module_tree):
-                        if isinstance(node, ast.FunctionDef) or isinstance(node, ast.ClassDef):
-                            if node.name == name:
-                                return module_file_path
+    for item in defs:
+        if item[1] == name:
+            return item[0]
 
     # If the name is not found, assume it's an external module
     return "No location detected"
 
-project_root = 'test_input/codegraph-main'
+project_root = 'test_input/test_repo'
 
+print("Stage 4: resolving references")
 current_ref = None
-for i, item in enumerate(data):
+for i, item in enumerate(tqdm(data)):
     if item['kind'] == "def":
         current_ref = item.copy()
         continue
@@ -171,18 +172,19 @@ for i, item in enumerate(data):
     file_path = item['rel_fname']
 
     definition_location = resolve_reference(name, file_path, project_root)
-    definition_location = definition_location[len(project_root)+1:]
+    definition_location = '/'.join(definition_location.split('/')[2:])
 
     location_id = nodes_csv.get((definition_location, name), -1)
     
     if location_id == -1: continue
+    try:
+        edges_csv.add((
+            nodes_csv[(current_ref['rel_fname'], current_ref['name'])],
+            "references", location_id
+        ))
+    except: pass
 
-    edges_csv.add((
-        nodes_csv[(current_ref['rel_fname'], current_ref['name'])],
-        "references", location_id
-    ))
-
-
+print("Stage 5: writing nodes to files")
 for item in data:
     loc = (item['rel_fname'], item['name'])
     node_id = nodes_csv.get(loc, -1)
@@ -203,8 +205,11 @@ nodes = sorted(nodes, key=lambda l:l[0])
 with open("test_input/output/nodes.csv", 'w') as f:
     f.write("id,name\n")
     for item in nodes:
-        data = item[1].replace("\n", '\\n')
-        f.write(f"{item[0]},{data}\n")
+        try:
+            data = item[1].replace("\n", '\\n')
+            f.write(f"{item[0]},{data}\n")
+        except:
+            pass
 
 with open("test_input/output/edges.csv", 'w') as f:
     f.write("id_head,type,id_tail\n")
