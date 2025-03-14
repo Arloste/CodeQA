@@ -215,3 +215,58 @@ with open("test_input/output/edges.csv", 'w') as f:
     f.write("id_head,type,id_tail\n")
     for item in edges_csv:
         f.write(f"{item[0]},{item[1]},{item[2]}\n")
+
+
+import importlib.util
+import sys
+
+# Assuming the folder is named 'my-folder' and it contains a module 'mymodule.py'
+folder_name = 'G-Retriever'
+module_name = 'src/utils/lm_modeling'
+
+# Construct the full path to the module
+module_path = f"./{folder_name}/{module_name}.py"
+
+# Load the module
+spec = importlib.util.spec_from_file_location(module_name, module_path)
+module = importlib.util.module_from_spec(spec)
+sys.modules[module_name] = module
+spec.loader.exec_module(module)
+
+graph_output_folder = "test_input/output"
+
+with open(f"{graph_output_folder}/edges.csv") as f:
+    edges = f.readlines()[1:]
+    edges = [x.strip().split(',') for x in edges]
+    heads, relation_types, tails = zip(*edges)
+
+with open(f"{graph_output_folder}/nodes.csv") as f:
+    nodes = f.readlines()[1:]
+    nodes = [x.strip().split(',') for x in nodes]
+    node_ids = [x[0] for x in nodes]
+    nodes_texts = [','.join(x[1:]) for x in nodes]
+
+
+# default module name
+llm_module_name = "sbert"
+
+model, tokenizer, device = module.load_model[llm_module_name]()
+text2embedding = module.load_text2embedding[llm_module_name]
+
+
+from tqdm.notebook import tqdm
+import torch
+from torch_geometric.data.data import Data
+import pandas as pd
+
+print("Encoding the graph...")
+
+x = text2embedding(model, tokenizer, device, nodes_texts)
+e = text2embedding(model, tokenizer, device, relation_types)
+
+edge_index = torch.LongTensor([
+    pd.Series(heads).astype(int), pd.Series(tails).astype(int)
+])
+
+data = Data(x=x, edge_index=edge_index, edge_attr=e, num_nodes=len(nodes))
+torch.save(data, f'{graph_output_folder}/graph.pt')
