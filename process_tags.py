@@ -259,14 +259,32 @@ import torch
 from torch_geometric.data.data import Data
 import pandas as pd
 
-print("Encoding the graph...")
+def process_in_batches(elements, batch_size, processing_function, *args):
+    results = []
+    for i in tqdm(range(0, len(elements), batch_size)):
+        batch_elements = elements[i:i + batch_size]
+        batch_result = processing_function(*args, batch_elements)
+        results.append(batch_result)
+    return torch.cat(results, dim=0)
 
-x = text2embedding(model, tokenizer, device, nodes_texts)
-e = text2embedding(model, tokenizer, device, relation_types)
+# Define batch size
+batch_size = 100
 
+# Process nodes in batches
+print("Encoding graph nodes...")
+x = process_in_batches(nodes_texts, batch_size, text2embedding, model, tokenizer, device)
+
+# Process relation types in batches
+print("Encoding graph edges...")
+e = process_in_batches(relation_types, batch_size, text2embedding, model, tokenizer, device)
+
+# Create edge index tensor
 edge_index = torch.LongTensor([
     pd.Series(heads).astype(int), pd.Series(tails).astype(int)
 ])
 
-data = Data(x=x, edge_index=edge_index, edge_attr=e, num_nodes=len(nodes))
-torch.save(data, f'{graph_output_folder}/graph.pt')
+# Create graph data structure
+data = Data(x=x, edge_index=edge_index, edge_attr=e, num_nodes=len(nodes_texts))
+
+# Save the graph data
+torch.save(data, 'test_input_/output/graph.pt')
