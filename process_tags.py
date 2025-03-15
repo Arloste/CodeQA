@@ -1,7 +1,10 @@
 import json
 from tqdm import tqdm
 
-with open("tags.json", 'r') as f:
+TAGS_FILE_PATH = "tags.json"
+OUTPUT_FOLDER_PATH = "G-Retriever/dataset" # TODO check path correctness
+
+with open(TAGS_FILE_PATH, 'r') as f:
     data = [
         json.loads(x) for x in f.readlines()
     ]
@@ -202,7 +205,7 @@ for k, v in nodes_csv_items:
 nodes = [(k, v) for k, v in nodes_csv.items()]
 nodes = sorted(nodes, key=lambda l:l[0])
 
-with open("test_input/output/nodes.csv", 'w') as f:
+with open(f"{OUTPUT_FOLDER_PATH}/nodes.csv", 'w') as f:
     f.write("id,name\n")
     for item in nodes:
         try:
@@ -211,7 +214,7 @@ with open("test_input/output/nodes.csv", 'w') as f:
         except:
             pass
 
-with open("test_input/output/edges.csv", 'w') as f:
+with open(f"{OUTPUT_FOLDER_PATH}/edges.csv", 'w') as f:
     f.write("id_head,type,id_tail\n")
     for item in edges_csv:
         f.write(f"{item[0]},{item[1]},{item[2]}\n")
@@ -220,12 +223,8 @@ with open("test_input/output/edges.csv", 'w') as f:
 import importlib.util
 import sys
 
-# Assuming the folder is named 'my-folder' and it contains a module 'mymodule.py'
-folder_name = 'G-Retriever'
-module_name = 'src/utils/lm_modeling'
-
-# Construct the full path to the module
-module_path = f"./{folder_name}/{module_name}.py"
+# Path to the module
+module_path = f"./G-Retriever/src/utils/lm_modeling.py"
 
 # Load the module
 spec = importlib.util.spec_from_file_location(module_name, module_path)
@@ -233,21 +232,19 @@ module = importlib.util.module_from_spec(spec)
 sys.modules[module_name] = module
 spec.loader.exec_module(module)
 
-graph_output_folder = "test_input/output"
-
-with open(f"{graph_output_folder}/edges.csv") as f:
+with open(f"{OUTPUT_FOLDER_PATH}//edges.csv") as f:
     edges = f.readlines()[1:]
     edges = [x.strip().split(',') for x in edges]
     heads, relation_types, tails = zip(*edges)
 
-with open(f"{graph_output_folder}/nodes.csv") as f:
+with open(f"{OUTPUT_FOLDER_PATH}//nodes.csv") as f:
     nodes = f.readlines()[1:]
     nodes = [x.strip().split(',') for x in nodes]
     node_ids = [x[0] for x in nodes]
     nodes_texts = [','.join(x[1:]) for x in nodes]
 
 
-# default module name
+# default sentence-transformer name
 llm_module_name = "sbert"
 
 model, tokenizer, device = module.load_model[llm_module_name]()
@@ -287,4 +284,4 @@ edge_index = torch.LongTensor([
 data = Data(x=x, edge_index=edge_index, edge_attr=e, num_nodes=len(nodes_texts))
 
 # Save the graph data
-torch.save(data, 'test_input_/output/graph.pt')
+torch.save(data, f"{OUTPUT_FOLDER_PATH}/graph.pt")
