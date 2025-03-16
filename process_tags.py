@@ -232,16 +232,40 @@ module = importlib.util.module_from_spec(spec)
 sys.modules[module_name] = module
 spec.loader.exec_module(module)
 
-with open(f"{OUTPUT_FOLDER_PATH}//edges.csv") as f:
+with open(f"{OUTPUT_FOLDER_PATH}/edges.csv") as f:
     edges = f.readlines()[1:]
     edges = [x.strip().split(',') for x in edges]
-    heads, relation_types, tails = zip(*edges)
 
-with open(f"{OUTPUT_FOLDER_PATH}//nodes.csv") as f:
+with open(f"{OUTPUT_FOLDER_PATH}/nodes.csv") as f:
     nodes = f.readlines()[1:]
     nodes = [x.strip().split(',') for x in nodes]
     node_ids = [x[0] for x in nodes]
     nodes_texts = [','.join(x[1:]) for x in nodes]
+
+# Removing edges with missing nodes
+nodes_set = set(node_ids)
+edges = [e for e in edges if e[0] in nodes_set and e[2] in nodes_set]
+heads, relation_types, tails = zip(*edges)
+
+# Remapping nodes (due to Torch Geometric issue)
+node_mapping = dict()
+for i, node_id in enumerate(node_ids):
+    node_mapping[node_id] = str(i)
+
+node_ids = [node_mapping[n] for n in node_ids]
+heads = [node_mapping[x] for x in heads]
+tails = [node_mapping[x] for x in tails]
+
+# Writing updated nodes and edges to files
+with open(f"{OUTPUT_FOLDER_PATH}/edges.csv", 'w') as f:
+    f.write("id_head,type,id_tail\n")
+    for h, r, t in zip(heads, relation_types, tails):
+        f.write(f"{h},{r},{t}\n")
+
+with open(f"{OUTPUT_FOLDER_PATH}/nodes.csv", 'w') as f:
+    f.write("id,name\n")
+    for idx, node_name in zip(node_ids, nodes_texts):
+        f.write(f"{idx},{node_name}\n")
 
 
 # default sentence-transformer name
