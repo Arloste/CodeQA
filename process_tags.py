@@ -1,7 +1,9 @@
 import json
 from tqdm import tqdm
+import os
 
 TAGS_FILE_PATH = "tags.json"
+REPO_PATH = "test_repo"
 OUTPUT_FOLDER_PATH = "G-Retriever/dataset" # TODO check path correctness
 
 with open(TAGS_FILE_PATH, 'r') as f:
@@ -13,8 +15,38 @@ with open(TAGS_FILE_PATH, 'r') as f:
 
 unique_files = set()
 print("Stage 1: getting all unique files")
-for item in tqdm(data):
+for item in data:
     unique_files.add(item['rel_fname'])
+
+
+# list all plain text files
+# (because RepoGraph lists only .py files)
+
+plain_text_file_path = REPO_PATH + '/'
+file_types_to_consider = ["txt", 'md', 'yml']
+plain_text_files = list()
+
+def walk_dir(path, ind=0):
+    for name in os.listdir(path):
+        if os.path.isdir(path + name + '/'):
+            walk_dir(path + name + '/', ind+4)
+        else:
+            ext = name.split('.')[-1]
+            if ext in file_types_to_consider:
+                with open(path + name, 'r', encoding="utf-8") as f:
+                    contents = f.read()
+                    full_path = path + name
+                plain_text_files.append(
+                    (full_path[len(plain_text_file_path):], contents)
+                )
+                
+
+walk_dir(plain_text_file_path)
+plain_text_dict = {v[0]: v[1] for v in plain_text_files}
+
+for item in plain_text_files:
+    unique_files.add(item[0])
+
 
 unique_files = ["root/"+x for x in list(unique_files)]
 unique_files
@@ -69,7 +101,7 @@ defs_dict = dict()
 print("Stage 3: parsing definitions")
 for item in tqdm(data):
     if item['kind'] == "ref": continue
-    """f
+    """
     This thing also provides those relations
     file contains function
     file contains class
@@ -201,6 +233,11 @@ for k, v in nodes_csv_items:
         del nodes_csv[k]
         nodes_csv[v] = k
 
+nodes_csv_items = nodes_csv.copy().items()
+for node_id, node_location in nodes_csv_items:
+    if text := plain_text_dict.get(node_location, ""):
+        nodes_csv[node_id] = f"{node_location} file contents: {text}"
+
 
 nodes = [(k, v) for k, v in nodes_csv.items()]
 nodes = sorted(nodes, key=lambda l:l[0])
@@ -224,7 +261,9 @@ import importlib.util
 import sys
 
 # Path to the module
-module_path = f"./G-Retriever/src/utils/lm_modeling.py"
+folder_name = 'G-Retriever'
+module_name = 'src/utils/lm_modeling'
+module_path = f"./{folder_name}/{module_name}.py"
 
 # Load the module
 spec = importlib.util.spec_from_file_location(module_name, module_path)
@@ -280,24 +319,14 @@ import torch
 from torch_geometric.data.data import Data
 import pandas as pd
 
-def process_in_batches(elements, batch_size, processing_function, *args):
-    results = []
-    for i in tqdm(range(0, len(elements), batch_size)):
-        batch_elements = elements[i:i + batch_size]
-        batch_result = processing_function(*args, batch_elements)
-        results.append(batch_result)
-    return torch.cat(results, dim=0)
 
-# Define batch size
-batch_size = 100
-
-# Process nodes in batches
+# Process nodes
 print("Encoding graph nodes...")
-x = process_in_batches(nodes_texts, batch_size, text2embedding, model, tokenizer, device)
+x = text2embedding(model, tokenizer, device, nodes_texts)
 
-# Process relation types in batches
+# Process relation types
 print("Encoding graph edges...")
-e = process_in_batches(relation_types, batch_size, text2embedding, model, tokenizer, device)
+e = text2embedding(model, tokenizer, device, relation_types)
 
 # Create edge index tensor
 edge_index = torch.LongTensor([
