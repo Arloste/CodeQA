@@ -236,7 +236,30 @@ for k, v in nodes_csv_items:
 nodes_csv_items = nodes_csv.copy().items()
 for node_id, node_location in nodes_csv_items:
     if text := plain_text_dict.get(node_location, ""):
-        nodes_csv[node_id] = f"{node_location} file contents: {text}"
+        nodes_csv[node_id] = f"{node_location} file contents:\n{text}"
+
+
+file2contents = {}
+
+for file_name in unique_files:
+    if not file_name.endswith(".py"): continue
+    file_name = '/'.join(file_name.split('/')[1:])
+
+    with open(f"{REPO_PATH}/" + file_name, 'r') as f:
+        contents = f.readlines()
+    
+    lines_to_remove = set()
+    for tag in data:
+        if tag["rel_fname"] == file_name and type(tag["line"])  == list and len(tag["line"]) == 2 and tag["kind"] == "def":
+            start, end = tag["line"]
+            [lines_to_remove.add(x) for x in range(start, end+1)]
+    contents = [contents[x] for x in range(len(contents)) if x+1 not in lines_to_remove]
+    file2contents[file_name] = ''.join(contents)
+
+nodes_csv_items = nodes_csv.copy().items()
+for node_id, node_location in nodes_csv_items:
+    if text := file2contents.get(node_location, ""):
+        nodes_csv[node_id] = f"#{node_location}'s text outside functions:\n{text}"
 
 
 nodes = [(k, v) for k, v in nodes_csv.items()]
