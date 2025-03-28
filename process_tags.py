@@ -4,7 +4,8 @@ import os
 
 TAGS_FILE_PATH = "tags.json"
 REPO_PATH = "test_repo"
-OUTPUT_FOLDER_PATH = "G-Retriever/dataset" # TODO check path correctness
+# OUTPUT_FOLDER_PATH = "G-Retriever/dataset" # TODO check path correctness # PROD output folder
+OUTPUT_FOLDER_PATH = '.' # dev output folder
 
 with open(TAGS_FILE_PATH, 'r') as f:
     data = [
@@ -261,6 +262,38 @@ for node_id, node_location in nodes_csv_items:
     if text := file2contents.get(node_location, ""):
         nodes_csv[node_id] = f"#{node_location}'s text outside functions:\n{text}"
 
+# Adding class textual information that is outside the class methods
+# this is also not captured by RepoGraph
+class2contents = {}
+
+for i, item in enumerate(data):
+    if item['category'] == "class" and item['kind'] == 'def':
+        methods = set(item['info'].split('\n'))
+        class_def_span = set(range(*item['line']))
+        
+        lines_to_exclude = set()
+        for sub_item in data[i:]:
+            if sub_item['name'] in methods and sub_item['kind'] == 'def':
+                try:
+                    start, end = sub_item['line']
+                    [lines_to_exclude.add(x) for x in range(start, end+1)]
+                except: print("Could not read the lines")
+        lines_left = class_def_span  - lines_to_exclude
+
+        with open(f"{REPO_PATH}/" + item['rel_fname'], 'r') as f:
+            contents = f.readlines()
+        contents = [contents[x-1] for x in sorted(list(lines_left))]
+        class2contents[(item['rel_fname'], item['name'])] = ''.join(contents)
+
+for node_id, node_text in nodes_csv.items():
+    for (class_file_name, class_name), class_text in class2contents.items():
+        if class_file_name in node_text and class_name in node_text:
+            class_location, *class_methods = node_text.split('\n')
+            text = f"{class_location}\n{class_text}\n#This class contains functions: {node_text}"
+            nodes_csv[node_id] = text
+            break
+
+# Sorting the nodes so that their IDs in the ascending order
 
 nodes = [(k, v) for k, v in nodes_csv.items()]
 nodes = sorted(nodes, key=lambda l:l[0])
