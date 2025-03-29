@@ -187,9 +187,13 @@ def resolve_reference(name, file_path, project_root):
             if os.path.exists(module_file):
                 return module_file
 
-    # Search the project directory for the definition
+    # Search all defined functions and search for the definition
     for item in defs:
-        if item[1] == name:
+        import_count = sum([
+            item[0].split('/')[-1][:-3] in imported_file_path
+            for imported_file_path in imports.values()
+        ])
+        if import_count and item[1] == name:
             return item[0]
 
     # If the name is not found, assume it's an external module
