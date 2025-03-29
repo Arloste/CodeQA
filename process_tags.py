@@ -34,12 +34,15 @@ def walk_dir(path, ind=0):
         else:
             ext = name.split('.')[-1]
             if ext in file_types_to_consider:
-                with open(path + name, 'r', encoding="utf-8") as f:
-                    contents = f.read()
-                    full_path = path + name
-                plain_text_files.append(
-                    (full_path[len(plain_text_file_path):], contents)
-                )
+                try:
+                    with open(path + name, 'r', encoding="utf-8") as f:
+                        contents = f.read()
+                        full_path = path + name
+                    plain_text_files.append(
+                        (full_path[len(plain_text_file_path):], contents)
+                    )
+                except:
+                    print("Problem with file: ", path + name)
                 
 
 walk_dir(plain_text_file_path)
@@ -224,7 +227,6 @@ for i, item in enumerate(tqdm(data)):
         ))
     except: pass
 
-print("Stage 5: writing nodes to files")
 for item in data:
     loc = (item['rel_fname'], item['name'])
     node_id = nodes_csv.get(loc, -1)
@@ -244,9 +246,10 @@ for node_id, node_location in nodes_csv_items:
         nodes_csv[node_id] = f"{node_location} file contents:\n{text}"
 
 
+print("Step 4.1: Update file information")
 file2contents = {}
 
-for file_name in unique_files:
+for file_name in tqdm(unique_files):
     if not file_name.endswith(".py"): continue
     file_name = '/'.join(file_name.split('/')[1:])
 
@@ -268,9 +271,11 @@ for node_id, node_location in nodes_csv_items:
 
 # Adding class textual information that is outside the class methods
 # this is also not captured by RepoGraph
+print("Step 4.2: Update class information")
+
 class2contents = {}
 
-for i, item in enumerate(data):
+for i, item in tqdm(enumerate(data), total=len(data)):
     if item['category'] == "class" and item['kind'] == 'def':
         methods = set(item['info'].split('\n'))
         class_def_span = set(range(*item['line']))
@@ -297,6 +302,7 @@ for node_id, node_text in nodes_csv.items():
             nodes_csv[node_id] = text
             break
 
+print("Stage 5: writing nodes to files")
 # Sorting the nodes so that their IDs in the ascending order
 
 nodes = [(k, v) for k, v in nodes_csv.items()]
