@@ -3,7 +3,7 @@ from tqdm import tqdm
 import os
 
 TAGS_FILE_PATH = "tags.json"
-REPO_PATH = "test_repo"
+REPO_PATH = "input_repository"
 # OUTPUT_FOLDER_PATH = "G-Retriever/dataset" # TODO check path correctness # PROD output folder
 OUTPUT_FOLDER_PATH = '.' # dev output folder
 
@@ -287,9 +287,9 @@ for i, item in enumerate(data):
 
 for node_id, node_text in nodes_csv.items():
     for (class_file_name, class_name), class_text in class2contents.items():
-        if class_file_name in node_text and class_name in node_text:
+        if node_text.count(' ') == 2 and class_file_name in node_text and class_name in node_text:
             class_location, *class_methods = node_text.split('\n')
-            text = f"{class_location}\n{class_text}\n#This class contains functions: {node_text}"
+            text = f"{class_location}\n{class_text}\n#This class contains functions: {class_methods}"
             nodes_csv[node_id] = text
             break
 
