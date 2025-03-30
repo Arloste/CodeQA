@@ -89,9 +89,9 @@ def extract_relationships(file_paths):
                     nodes_csv[folder] = len(nodes_csv)
 
             relation = "folder" if i < len(parts) - 1 else "file"
-            relationships.add(f"{current_folder} contains {relation} {next_part}")
+            relationships.add(f"{current_folder} folder contains {relation} {next_part}")
             edges_csv.add((
-                nodes_csv[current_folder], f"contains {relation}", nodes_csv[next_part]
+                nodes_csv[current_folder], f"folder contains {relation}", nodes_csv[next_part]
             ))
 
     return list(relationships)
@@ -140,9 +140,11 @@ for item in tqdm(data):
             ))
 
 
-
+print("Stage 4: resolving references")
 import ast
 import os
+
+traversed_files_dict = {}
 
 def resolve_reference(name, file_path, project_root):
     """
@@ -158,22 +160,26 @@ def resolve_reference(name, file_path, project_root):
     """
 
     # Parse the file to analyze imports and definitions
-    try:
-        # Track imports
-        imports = {}
+    imports = {}
+    if (project_root, file_path) not in traversed_files_dict:
+        
+        try:
+            # Track imports
+            
 
-        with open(os.path.join(project_root, file_path), 'r') as file:
-            tree = ast.parse(file.read())
+            with open(os.path.join(project_root, file_path), 'r') as file:
+                tree = ast.parse(file.read())
 
-        for node in ast.walk(tree):
-            if isinstance(node, ast.Import):
-                for alias in node.names:
-                    imports[alias.asname or alias.name] = alias.name
-            elif isinstance(node, ast.ImportFrom):
-                module = node.module
-                for alias in node.names:
-                    imports[alias.asname or alias.name] = f"{module}.{alias.name}"
-    except: pass
+            for node in ast.walk(tree):
+                if isinstance(node, ast.Import):
+                    for alias in node.names:
+                        imports[alias.asname or alias.name] = alias.name
+                elif isinstance(node, ast.ImportFrom):
+                    module = node.module
+                    for alias in node.names:
+                        imports[alias.asname or alias.name] = f"{module}.{alias.name}"
+        except: pass
+        traversed_files_dict[(project_root, file_path)] = imports
 
     # Check if the name is imported
     if name in imports:
@@ -192,19 +198,14 @@ def resolve_reference(name, file_path, project_root):
 
     # Search all defined functions and search for the definition
     for item in defs:
-        import_count = sum([
-            item[0].split('/')[-1][:-3] in imported_file_path
-            for imported_file_path in imports.values()
-        ])
-        if import_count and item[1] == name:
+        if name in item[1][:60]:
             return item[0]
 
     # If the name is not found, assume it's an external module
     return "No location detected"
 
-project_root = 'test_input/test_repo'
 
-print("Stage 4: resolving references")
+
 current_ref = None
 for i, item in enumerate(tqdm(data)):
     if item['kind'] == "def":
@@ -214,9 +215,10 @@ for i, item in enumerate(tqdm(data)):
     name = item['name']
     file_path = item['rel_fname']
 
-    definition_location = resolve_reference(name, file_path, project_root)
-    definition_location = '/'.join(definition_location.split('/')[2:])
+    definition_location = resolve_reference(name, file_path, REPO_PATH)
+    definition_location = '/'.join(definition_location.split('/')[1:])
 
+    
     location_id = nodes_csv.get((definition_location, name), -1)
     
     if location_id == -1: continue
