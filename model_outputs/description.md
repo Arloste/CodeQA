@@ -3,8 +3,11 @@
 ### Model outputs
 TODO remove the prompt from questions and keep the user question only
 
-1. `Baseline model results.json` - simple RAG without graphs / no .txt files included
-2. `results_standard.jsonl` - graph LLM / no .txt files included
+1. `Incompelete graph & RAG LLM.json` - simple RAG. No .txt files included
+2. `Incomplete graph & Graph LLM.jsonl` - Graph LLM. No .txt files included
+
+3. `Full graph & baseline LLM.jsonl` - simple RAG wihout GNNs. Graph structure extended with text files and updated node information
+4. `Full graph & GNN.txt` - Graph LLM. Extended graph structure
 
 ### Evaluations on model vs model
 
@@ -12,4 +15,4 @@ Nothing here yet
 
 ### Evaluations on one model
 
-`eval_standard.txt` - shows the quality of output #2 against ground truth answers.
+`Absolute eval - Incomplete graph & Graph LLM.txt` - shows the quality of output #2 against ground truth answers.
